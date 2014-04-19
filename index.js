@@ -30,17 +30,24 @@ function RepositoryStream(user, repo, auth, options) {
 
   this._state = {};
 
-  var updateFrequency = ms((options.update || 1000) + '');
+  var updateFrequency = ms((options.update || (this._auth ? '1s' : '60s')) + '');
 
   this.setPending();
   var doUpdate = function () {
     var before = this._head;
-    this.getHead().then(function (head) {
-      if (before !== head) {
-        this.setPending();
-        return this.pushUpdates(this.getFiles(head));
-      }
-    }.bind(this)).done(function () {
+    var ready;
+    if (this._auth) {
+      ready = this.getHead().then(function (head) {
+        if (before !== head) {
+          this.setPending();
+          return this.pushUpdates(this.getFiles(head));
+        }
+      }.bind(this));
+    } else {
+      this.setPending();
+      ready = this.pushUpdates(this.getFiles(this._branch));
+    }
+    ready.done(function () {
       this.setReady();
       setTimeout(doUpdate, updateFrequency);
     }.bind(this), function (err) {
