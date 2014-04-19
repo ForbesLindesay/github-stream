@@ -1,26 +1,27 @@
 {
-  "name": "github-store",
+  "name": "github-stream",
   "version": "0.0.0",
-  "description": "Use a github repository like the local file system it was always meant to be",
+  "description": "Stream updates to the files in a GitHub repository.",
   "keywords": [],
   "dependencies": {
     "ms": "^0.6.2",
-    "mkdirp": "^0.3.5",
     "promise": "^4.0.0",
     "tar": "^0.1.19",
     "github-basic": "^2.1.1",
     "concat-stream": "^1.4.5",
-    "pull-request": "^3.0.0"
+    "barrage": "~1.0.0"
   },
   "devDependencies": {
-    "mocha": "*"
+    "pull-request": "^3.0.0",
+    "then-queue": "~1.1.0",
+    "testit": "~1.2.0"
   },
   "scripts": {
-    "test": "mocha -R spec"
+    "test": "node test"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ForbesLindesay/github-store.git"
+    "url": "https://github.com/ForbesLindesay/github-stream.git"
   },
   "author": "ForbesLindesay",
   "license": "MIT"
