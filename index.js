@@ -11,7 +11,6 @@ var github = require('github-basic');
 var tar = require('tar');
 var concat = require('concat-stream');
 var ms = require('ms');
-var mkdirp = require('mkdirp');
 
 module.exports = RepositoryStream;
 function RepositoryStream(user, repo, auth, options) {
