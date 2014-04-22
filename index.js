@@ -52,7 +52,7 @@ function RepositoryStream(user, repo, auth, options) {
       setTimeout(doUpdate, updateFrequency);
     }.bind(this), function (err) {
       this.emit('error', err);
-      setTimeout(doUpdate, updateFrequency * 10);
+      setTimeout(doUpdate, retryFrequency);
     }.bind(this));
   }.bind(this);
   doUpdate();
