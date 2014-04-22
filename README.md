@@ -2,9 +2,9 @@
 
 Get a stream of updates to a GitHub repository.
 
-[![Build Status](https://travis-ci.org/ForbesLindesay/github-stream.png?branch=master)](https://travis-ci.org/ForbesLindesay/github-stream)
-[![Dependency Status](https://gemnasium.com/ForbesLindesay/github-stream.png)](https://gemnasium.com/ForbesLindesay/github-stream)
-[![NPM version](https://badge.fury.io/js/github-stream.png)](http://badge.fury.io/js/github-stream)
+[![Build Status](https://img.shields.io/travis/ForbesLindesay/github-stream/master.svg)](https://travis-ci.org/ForbesLindesay/github-stream)
+[![Dependency Status](https://img.shields.io/gemnasium/ForbesLindesay/github-stream.svg)](https://gemnasium.com/ForbesLindesay/github-stream)
+[![NPM version](https://img.shields.io/npm/v/github-stream.svg)](http://badge.fury.io/js/github-stream)
 
 ## Installation
 
