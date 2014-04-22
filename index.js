@@ -29,7 +29,8 @@ function RepositoryStream(user, repo, auth, options) {
 
   this._state = {};
 
-  var updateFrequency = ms((options.update || (this._auth ? '1s' : '60s')) + '');
+  var updateFrequency = ms((options.updateFrequency || (this._auth ? '1s' : '60s')) + '');
+  var retryFrequency = ms(options.retryFrequency || (updateFrequency + 'ms'));
 
   this.setPending();
   var doUpdate = function () {
