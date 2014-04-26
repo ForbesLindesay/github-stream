@@ -1,16 +1,13 @@
 'use strict';
 
-var zlib = require('zlib');
 var crypto = require('crypto');
-var fs = require('fs');
-var pth = require('path');
 var Transform = require('barrage').Transform;
 var Readable = require('barrage').Readable;
 var Promise = require('promise');
-var github = require('github-basic');
-var tar = require('tar');
-var concat = require('concat-stream');
 var ms = require('ms');
+
+var CommitStream = require('./lib/commits.js');
+var CurrentFilesStream = require('./lib/current-files.js');
 
 module.exports = RepositoryStream;
 function RepositoryStream(user, repo, auth, options) {
@@ -22,131 +19,39 @@ function RepositoryStream(user, repo, auth, options) {
   this._branch = options.branch || 'master';
   this._auth = typeof auth === 'string' ? {type: 'oauth', token: auth} : auth;
 
-  this._rateLimit = 5000;
-  this._rateRemaining = 5000;
-  this._etag = undefined;
-  this._head = undefined;
-
   this._state = {};
 
   var updateFrequency = ms((options.updateFrequency || (this._auth ? '1s' : '60s')) + '');
   var retryFrequency = ms(options.retryFrequency || (updateFrequency + 'ms'));
 
-  this.setPending();
-  var doUpdate = function () {
-    var before = this._head;
-    var ready;
-    if (this._auth) {
-      ready = this.getHead().then(function (head) {
-        if (before !== head) {
-          this.setPending();
-          return this.pushUpdates(this.getFiles(head));
-        }
+  if (this._auth) {
+    var commits = new CommitStream(this._user, this._repo, this._auth, options);
+    var ready = Promise.from(null);
+    commits.on('data', function (tag) {
+      ready = ready.then(function () {
+        return this.pushUpdates(new CurrentFilesStream(this._user, this._repo, this._auth, tag));
+      }.bind(this)).then(null, function (err) {
+        this.emit('error', err);
       }.bind(this));
-    } else {
-      this.setPending();
-      ready = this.pushUpdates(this.getFiles(this._branch));
-    }
-    ready.done(function () {
-      this.setReady();
-      setTimeout(doUpdate, updateFrequency);
-    }.bind(this), function (err) {
-      this.emit('error', err);
-      setTimeout(doUpdate, retryFrequency);
+      ready.done();
     }.bind(this));
-  }.bind(this);
-  doUpdate();
+  } else {
+    var update = function () {
+      this.pushUpdates(new CurrentFilesStream(
+        this._user, this._repo, this._auth, this._branch)).done(function () {
+        setTimeout(update, updateFrequency);
+      }, function (err) {
+        this.emit('error', err);
+        setTimeout(update, retryFrequency);
+      }.bind(this));
+    }.bind(this);
+    update();
+  }
 }
 RepositoryStream.prototype = Object.create(Readable.prototype);
 RepositoryStream.prototype.constructor = RepositoryStream;
 RepositoryStream.prototype._read = function () {};
 
-/**
- * Return the sha of the head commit on the current branch.  This also updates the _etag and _head properties to enable caching.
- *
- * @returns {String}
- */
-RepositoryStream.prototype.getHead = function () {
-  return github.buffer('get', '/repos/:owner/:repo/git/refs/:ref', {
-    owner: this._user,
-    repo: this._repo,
-    ref: 'heads/' + this._branch
-  }, {auth: this._auth, headers: {
-    'If-None-Match': this._etag
-  }}).then(function (res) {
-    this._rateLimit = res.headers['x-ratelimit-limit'];
-    this._rateRemaining = res.headers['x-ratelimit-remaining'];
-    if (res.statusCode === 200) {
-      var body = JSON.parse(res.body.toString('utf8'));
-      this._head = body.object.sha;
-      this._etag = res.headers['etag'];
-    }
-    return this._head;
-  }.bind(this));
-};
-
-/**
- * Returns a stream of all the files in the repository.
- *
- * @returns {Stream.<FileSystemObject>
- */
-RepositoryStream.prototype.getFiles = function (tag) {
-  var stream = new Transform({objectMode: true});
-  stream._transform = function (entry, _, callback) {
-    entry.then(function (entry) {
-      stream.push(entry);
-    }).nodeify(callback);
-  };
-  var errored = false;
-  function reject(err) {
-    errored = true;
-    setTimeout(function () {
-      stream.emit('error', err);
-      stream.end();
-    }, 0);
-  }
-  function push(entry) {
-    if (!errored) {
-      var type = entry.type;
-      var path = entry.path.replace(/^[^\/]*/, '');
-      if (type === 'Directory') {
-        stream.write(Promise.from({type: type, path: path}));
-      } else if (type === 'File') {
-        stream.write(new Promise(function (resolve) {
-          return entry.pipe(concat(function (body) {
-            resolve({type: type, path: path, body: body});
-          }));
-        }));
-      }
-    }
-  }
-  github('GET', '/:user/:repo/archive/:tag.tar.gz', {
-    user: this._user,
-    repo: this._repo,
-    tag: tag
-  }, {
-    auth: this._auth,
-    host: 'github.com'
-  }).then(function (res) {
-    if (res.statusCode !== 200) {
-      throw new Error('Unexpected status code ' + res.statusCode);
-    }
-    var gunzip = zlib.createGunzip();
-    var extract = new tar.Parse();
-    res.body.on('error', reject);
-    gunzip.on('error', reject);
-    extract.on('error', reject);
-    res.body.pipe(gunzip).pipe(extract);
-
-    extract.on('entry', push);
-    extract.on('end', function () {
-      if (!errored) {
-        stream.end();
-      }
-    });
-  }).done(null, reject);
-  return stream;
-};
 
 RepositoryStream.prototype.pushUpdates = function (files) {
   return new Promise(function (resolve, _reject) {
@@ -205,8 +110,3 @@ RepositoryStream.prototype.setPending = function () {
 RepositoryStream.waitUntilReady = function () {
   return this.ready;
 };
-
-
-function getHash(data) {
-  return crypto.createHash('sha512').update(data).digest('hex');
-}
