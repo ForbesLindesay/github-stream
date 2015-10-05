@@ -13,41 +13,35 @@ var concat = require('concat-stream');
 var ms = require('ms');
 
 module.exports = RepositoryStream;
-function RepositoryStream(user, repo, auth, options) {
+function RepositoryStream(user, repo, options) {
   Readable.call(this, {objectMode: true});
-  
+
   options = options || {};
   this._user = user;
   this._repo = repo;
   this._branch = options.branch || 'master';
-  this._auth = typeof auth === 'string' ? {type: 'oauth', token: auth} : auth;
+  this._auth = typeof options.auth === 'string' ? {type: 'oauth', token: options.auth} : options.auth;
 
   this._rateLimit = 5000;
   this._rateRemaining = 5000;
-  this._etag = undefined;
   this._head = undefined;
 
-  this._state = {};
+  this._state = options.state || {etag: undefined, files: {}};
 
-  var updateFrequency = ms((options.updateFrequency || (this._auth ? '1s' : '60s')) + '');
+  var updateFrequency = ms((options.updateFrequency || '10s') + '');
   var retryFrequency = ms(options.retryFrequency || (updateFrequency + 'ms'));
 
   this.setPending();
   var doUpdate = function () {
+    if (this._disposed) return;
     var before = this._head;
     var ready;
-    if (this._auth) {
-      ready = this.getHead().then(function (head) {
-        if (before !== head) {
-          this.setPending();
-          return this.pushUpdates(this.getFiles(head));
-        }
-      }.bind(this));
-    } else {
-      this.setPending();
-      ready = this.pushUpdates(this.getFiles(this._branch));
-    }
-    ready.done(function () {
+    this.getHead().then(function (head) {
+      if (before !== head) {
+        this.setPending();
+        return this.pushUpdates(this.getFiles(head));
+      }
+    }.bind(this)).done(function () {
       this.setReady();
       setTimeout(doUpdate, updateFrequency);
     }.bind(this), function (err) {
@@ -61,6 +55,10 @@ RepositoryStream.prototype = Object.create(Readable.prototype);
 RepositoryStream.prototype.constructor = RepositoryStream;
 RepositoryStream.prototype._read = function () {};
 
+RepositoryStream.prototype.dispose = function () {
+  this._disposed = true;
+};
+
 /**
  * Return the sha of the head commit on the current branch.  This also updates the _etag and _head properties to enable caching.
  *
@@ -72,14 +70,14 @@ RepositoryStream.prototype.getHead = function () {
     repo: this._repo,
     ref: 'heads/' + this._branch
   }, {auth: this._auth, headers: {
-    'If-None-Match': this._etag
+    'If-None-Match': this._state.etag
   }}).then(function (res) {
     this._rateLimit = res.headers['x-ratelimit-limit'];
     this._rateRemaining = res.headers['x-ratelimit-remaining'];
     if (res.statusCode === 200) {
       var body = JSON.parse(res.body.toString('utf8'));
       this._head = body.object.sha;
-      this._etag = res.headers['etag'];
+      this._state = {etag: res.headers['etag'], files: this._state.files};
     }
     return this._head;
   }.bind(this));
@@ -110,7 +108,7 @@ RepositoryStream.prototype.getFiles = function (tag) {
       var type = entry.type;
       var path = entry.path.replace(/^[^\/]*/, '');
       if (type === 'Directory') {
-        stream.write(Promise.from({type: type, path: path}));
+        stream.write(Promise.resolve({type: type, path: path}));
       } else if (type === 'File') {
         stream.write(new Promise(function (resolve) {
           return entry.pipe(concat(function (body) {
@@ -120,13 +118,12 @@ RepositoryStream.prototype.getFiles = function (tag) {
       }
     }
   }
-  github('GET', '/:user/:repo/archive/:tag.tar.gz', {
+  github('GET', 'https://github.com/:user/:repo/archive/:tag.tar.gz', {
     user: this._user,
     repo: this._repo,
     tag: tag
   }, {
-    auth: this._auth,
-    host: 'github.com'
+    auth: this._auth
   }).then(function (res) {
     if (res.statusCode !== 200) {
       throw new Error('Unexpected status code ' + res.statusCode);
@@ -156,37 +153,38 @@ RepositoryStream.prototype.pushUpdates = function (files) {
       _reject(err);
     }
     var oldState = this._state;
-    var newState = this._state = {};
+    var newState = this._state = {etag: oldState.etag, files: {}};
     files.on('data', function (node) {
       if (errored) return;
       var type = node.type;
       var path = node.path;
       var body = node.body || null;
       var hash = type === 'Directory' ? type : getHash(body);
-      newState[path] = hash;
-      if (oldState[path] === hash) return;
-      if (oldState[path] === 'Directory' && type === 'File') {
+      newState.files[path] = hash;
+      if (oldState.files[path] === hash) return;
+      if (oldState.files[path] === 'Directory' && type === 'File') {
         this.push({type: 'Directory', action: 'Delete', path: path});
-        delete oldState[path];
+        delete oldState.files[path];
       }
-      if (oldState[path]) {
+      if (oldState.files[path]) {
         this.push({type: type, action: 'Update', path: path, body: body});
       } else {
         this.push({type: type, action: 'Create', path: path, body: body});
       }
     }.bind(this));
-    
+
     files.on('error', reject);
     files.on('end', function () {
-      Object.keys(oldState).forEach(function (path) {
-        if (!newState[path]) {
+      Object.keys(oldState.files).forEach(function (path) {
+        if (!newState.files[path]) {
           this.push({
-            type: oldState[path] === 'Directory' ? 'Directory' : 'File',
+            type: oldState.files[path] === 'Directory' ? 'Directory' : 'File',
             action: 'Delete',
             path: path
           });
         }
       }.bind(this));
+      this.emit('state-updated', newState);
       resolve(null);
     }.bind(this));
   }.bind(this));
@@ -202,7 +200,7 @@ RepositoryStream.prototype.setPending = function () {
     };
   }.bind(this));
 };
-RepositoryStream.waitUntilReady = function () {
+RepositoryStream.prototype.waitUntilReady = function () {
   return this.ready;
 };
 

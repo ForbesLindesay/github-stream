@@ -4,16 +4,16 @@
   "description": "Stream updates to the files in a GitHub repository.",
   "keywords": [],
   "dependencies": {
-    "ms": "~0.6.2",
-    "promise": "~4.0.0",
-    "tar": "~0.1.19",
-    "github-basic": "~2.1.1",
-    "concat-stream": "~1.4.5",
-    "barrage": "~1.0.0"
+    "barrage": "^1.1.0",
+    "concat-stream": "^1.5.0",
+    "github-basic": "^3.0.0",
+    "ms": "^0.7.1",
+    "promise": "^7.0.4",
+    "tar": "^2.2.1"
   },
   "devDependencies": {
     "pull-request": "~3.0.0",
-    "testit": "~1.2.0"
+    "testit": "^2.0.2"
   },
   "scripts": {
     "test": "node test"
