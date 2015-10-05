@@ -1,6 +1,6 @@
 {
   "name": "github-stream",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stream updates to the files in a GitHub repository.",
   "keywords": [],
   "dependencies": {
