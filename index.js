@@ -65,13 +65,15 @@ RepositoryStream.prototype.dispose = function () {
  * @returns {String}
  */
 RepositoryStream.prototype.getHead = function () {
+  var requestOptions = this._auth ? {auth: this._auth} : {};
+  requestOptions.headers = {
+    'If-None-Match': this._state.etag
+  };
   return github.buffer('get', '/repos/:owner/:repo/git/refs/:ref', {
     owner: this._user,
     repo: this._repo,
     ref: 'heads/' + this._branch
-  }, {auth: this._auth, headers: {
-    'If-None-Match': this._state.etag
-  }}).then(function (res) {
+  }, requestOptions).then(function (res) {
     this._rateLimit = res.headers['x-ratelimit-limit'];
     this._rateRemaining = res.headers['x-ratelimit-remaining'];
     if (res.statusCode === 200) {
@@ -118,13 +120,12 @@ RepositoryStream.prototype.getFiles = function (tag) {
       }
     }
   }
+  var requestOptions = this._auth ? {auth: this._auth} : {};
   github('GET', 'https://github.com/:user/:repo/archive/:tag.tar.gz', {
     user: this._user,
     repo: this._repo,
     tag: tag
-  }, {
-    auth: this._auth
-  }).then(function (res) {
+  }, requestOptions).then(function (res) {
     if (res.statusCode !== 200) {
       throw new Error('Unexpected status code ' + res.statusCode);
     }
