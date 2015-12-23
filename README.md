@@ -3,8 +3,8 @@
 Get a stream of updates to a GitHub repository.
 
 [![Build Status](https://img.shields.io/travis/ForbesLindesay/github-stream/master.svg)](https://travis-ci.org/ForbesLindesay/github-stream)
-[![Dependency Status](https://img.shields.io/gemnasium/ForbesLindesay/github-stream.svg)](https://gemnasium.com/ForbesLindesay/github-stream)
-[![NPM version](https://img.shields.io/npm/v/github-stream.svg)](http://badge.fury.io/js/github-stream)
+[![Dependency Status](https://img.shields.io/david/ForbesLindesay/github-stream.svg)](https://david-dm.org/ForbesLindesay/github-stream)
+[![NPM version](https://img.shields.io/npm/v/github-stream.svg)](https://www.npmjs.com/package/github-stream)
 
 ## Installation
 
