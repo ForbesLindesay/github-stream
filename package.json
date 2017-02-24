@@ -6,7 +6,7 @@
   "dependencies": {
     "barrage": "^1.1.0",
     "concat-stream": "^1.5.0",
-    "github-basic": "^3.0.0",
+    "github-basic": "^6.0.0",
     "ms": "^0.7.1",
     "promise": "^7.0.4",
     "tar": "^2.2.1"
