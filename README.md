@@ -1,5 +1,7 @@
 # github-stream
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/ForbesLindesay/github-stream.svg)](https://greenkeeper.io/)
+
 Get a stream of updates to a GitHub repository.
 
 [![Build Status](https://img.shields.io/travis/ForbesLindesay/github-stream/master.svg)](https://travis-ci.org/ForbesLindesay/github-stream)
